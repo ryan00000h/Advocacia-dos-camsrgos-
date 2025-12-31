@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advocacia Camargo | Sistema Jurídico</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #0a192f;
+            --accent: #c5a059;
+            --bg: #f4f7f6;
+            --white: #ffffff;
+            --danger: #8b0000;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: #333;
+        }
+
+        header {
+            background: var(--primary);
+            color: var(--white);
+            padding: 40px 20px;
+            text-align: center;
+            border-bottom: 4px solid var(--accent);
+        }
+
+        header h1 { font-family: 'Playfair Display', serif; font-size: 2.2rem; }
+
+        .container { max-width: 800px; margin: -30px auto 50px; padding: 0 15px; }
+
+        .page { display: none; }
+        .active { display: block; animation: fadeIn 0.5s; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .card {
+            background: var(--white);
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: 600; margin-bottom: 8px; color: var(--primary); }
+
+        input, textarea, select {
+            width: 100%; padding: 12px; border: 1px solid #ccc;
+            border-radius: 5px; font-size: 1rem; font-family: inherit;
+        }
+
+        button {
+            background: var(--primary); color: var(--white);
+            padding: 15px; border: none; border-radius: 5px;
+            cursor: pointer; font-weight: 600; width: 100%;
+            transition: 0.3s; text-transform: uppercase;
+        }
+
+        button:hover { background: #112240; transform: translateY(-2px); }
+
+        /* Estilo Admin */
+        .caso-item {
+            background: white; border-left: 5px solid var(--accent);
+            padding: 20px; margin-bottom: 15px; border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .tag {
+            background: var(--accent); color: white;
+            padding: 3px 10px; border-radius: 12px; font-size: 0.8rem;
+        }
+
+        .admin-footer { margin-top: 30px; text-align: center; }
+        .btn-link { background: none; color: var(--accent); width: auto; text-decoration: underline; border: none; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Advocacia Camargo</h1>
+    <p>Excelência e Transparência Jurídica</p>
+</header>
+
+<div class="container">
+    
+    <section id="userPage" class="page active">
+        <div class="card">
+            <h2 style="margin-bottom: 20px;">Relate seu Caso</h2>
+            <div class="form-group">
+                <label>Seu Nome</label>
+                <input type="text" id="userName" placeholder="Ex: João Silva">
+            </div>
+            <div class="form-group">
+                <label>Área de Interesse</label>
+                <select id="caseType">
+                    <option value="Direito Civil">Direito Civil</option>
+                    <option value="Trabalhista">Trabalhista</option>
+                    <option value="Família">Família</option>
+                    <option value="Criminal">Criminal</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Descrição Detalhada</label>
+                <textarea id="caseText" placeholder="Descreva por que foi processado ou deseja iniciar uma ação..."></textarea>
+            </div>
+            <button onclick="enviarCaso()">Enviar Caso para Análise</button>
+        </div>
+        <div class="admin-footer">
+            <button class="btn-link" onclick="solicitarAcessoAdmin()">Acesso Administrativo</button>
+        </div>
+    </section>
+
+    <section id="adminPage" class="page">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2>Casos Recebidos</h2>
+            <button onclick="deslogar()" style="width: auto; background: var(--danger); padding: 8px 15px;">Sair</button>
+        </div>
+        <div id="listaCasos">Carregando dados em tempo real...</div>
+    </section>
+
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+    // CONFIGURAÇÃO DO SEU FIREBASE
+    const firebaseConfig = {
+        apiKey: "AIzaSyDvjUwkFoQhroBV_-UjEp2s-wplpKBPQko", // Sua chave aplicada!
+        authDomain: "SEU-PROJETO.firebaseapp.com",     // Substitua pelo seu
+        projectId: "SEU-PROJETO",                      // Substitua pelo seu
+        storageBucket: "SEU-PROJETO.appspot.com",      // Substitua pelo seu
+        messagingSenderId: "SEU-ID",                   // Substitua pelo seu
+        appId: "SEU-APP-ID"                            // Substitua pelo seu
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // ENVIAR CASO (USUÁRIO)
+    window.enviarCaso = async () => {
+        const nome = document.getElementById('userName').value;
+        const tipo = document.getElementById('caseType').value;
+        const texto = document.getElementById('caseText').value;
+
+        if(!nome || !texto) return alert("Preencha todos os campos!");
+
+        try {
+            await addDoc(collection(db, "casos"), {
+                nome, tipo, texto, 
+                data: new Date().toISOString()
+            });
+            alert("Caso enviado! Entraremos em contato.");
+            document.getElementById('userName').value = "";
+            document.getElementById('caseText').value = "";
+        } catch (e) { alert("Erro ao enviar: " + e.message); }
+    };
+
+    // ACESSO ADMIN
+    window.solicitarAcessoAdmin = async () => {
+        const senha = prompt("Digite a senha administrativa:");
+        if(senha === "advocacia") {
+            try {
+                // Certifique-se de ter criado esse usuário no Firebase Auth (admin@advocacia.com)
+                await signInWithEmailAndPassword(auth, "admin@advocacia.com", "advocacia");
+                mudarTela('adminPage');
+                carregarCasosRealtime();
+            } catch (e) {
+                alert("Erro: Crie o usuário admin@advocacia.com no seu Firebase com a senha 'advocacia'.");
+            }
+        } else {
+            alert("Senha incorreta.");
+        }
+    };
+
+    function carregarCasosRealtime() {
+        const q = query(collection(db, "casos"), orderBy("data", "desc"));
+        onSnapshot(q, (snapshot) => {
+            const container = document.getElementById('listaCasos');
+            container.innerHTML = "";
+            snapshot.forEach(doc => {
+                const item = doc.data();
+                container.innerHTML += `
+                    <div class="caso-item">
+                        <div style="display:flex; justify-content:space-between">
+                            <strong>${item.nome}</strong>
+                            <span class="tag">${item.tipo}</span>
+                        </div>
+                        <p style="margin-top:10px">${item.texto}</p>
+                        <small style="color:#888">${new Date(item.data).toLocaleString()}</small>
+                    </div>
+                `;
+            });
+        });
+    }
+
+    function mudarTela(id) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+
+    window.deslogar = () => { signOut(auth); mudarTela('userPage'); };
+
+</script>
+</body>
+  </html>
